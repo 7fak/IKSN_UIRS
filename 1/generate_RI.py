@@ -1,9 +1,9 @@
 from PIL import Image, ImageDraw, ImageFont
 
-def text(symbol, output_path, font="arial.ttf", size=64):
+def text(symbol, output_path, size=64):
     image = Image.new("RGB", (size, size), "white")
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype("arial.ttf", size-2)
+    font = ImageFont.truetype("./fonts/CoopBlack_Cyrillic_0.ttf", size-5)
     draw.text((1, 1), symbol, font=font, fill=(0,0,0))
     image.save(output_path)
 

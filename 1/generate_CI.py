@@ -1,11 +1,11 @@
 from PIL import Image, ImageDraw, ImageFont
 import random
 
-def text(symbol, output_path, font="arial.ttf", size=100, RI_size=32):
+def text(symbol, output_path, size=100, RI_size=32):
     image = Image.new("RGB", (size, size), "white")
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype("arial.ttf", RI_size-2)
-    draw.text((random.randint(0, size-64), random.randint(0, size-64)), symbol, font=font, fill=(0, 0, 0))
+    font = ImageFont.truetype("./fonts/CoopBlack_Cyrillic_0.ttf", RI_size-5)
+    draw.text((random.randint(0, size-RI_size), random.randint(0, size-RI_size)), symbol, font=font, fill=(0, 0, 0))
     image.save(output_path)
 
 if __name__ == "__main__":
