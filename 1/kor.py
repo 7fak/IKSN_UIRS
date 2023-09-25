@@ -4,25 +4,10 @@ import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d
 from matplotlib import cm
 import sys
-#from numba import njit
+from numba import njit
 
-#@njit(parallel=True)
-#def main():
-#    pass
-
-if __name__ == "__main__":
-    symbol = ["2"]
-    for s in symbol:
-        img_ci = Image.open('./img/CI_{}.png'.format(s))
-        img_ri = Image.open('./img/RI_{}.png'.format(s))
-
-        ci = np.asarray(img_ci.convert('L'))
-        ri = np.asarray(img_ri.convert('L'))
-        print(ci.dtype)
-
-        print(ci.shape) # (256, 256)
-        print(ri.shape) # (64, 64)
-
+@njit(parallel=True)
+def main(ci, ri):
         k = np.zeros((ci.shape[0]-ri.shape[0], ci.shape[1]-ri.shape[1]), dtype=np.float64)
         k1 = np.zeros((ci.shape[0]-ri.shape[0], ci.shape[1]-ri.shape[1]), dtype=np.float64)
         i0 = ri.shape[0]
@@ -31,30 +16,38 @@ if __name__ == "__main__":
         m_ri = ri.mean()
 
         
-        for di in range(0, ci.shape[0]-i0, 1): #, int(ri.shape[0]/4)):
-            for dj in range(0, ci.shape[1]-j0, 1): #, int(ri.shape[1]/4)):
-                for i in range(0, i0):
-                    for j in range(0, j0):
-                        k[di, dj] +=(ri[i,j]-m_ri)*(ci[i+di, j+dj]-m_ci)
-                        k1[di, dj] += (ri[i, j] - ci[i+di, j+dj])
+        for di in range(0, ci.shape[0]-i0, 1):                              # Перебор всех строк исходного изображения
+            for dj in range(0, ci.shape[1]-j0, 1):                          # Перебор всех столбцов одной строки исходного изображения
+                for i in range(0, i0):                                      # Перебор всех строк эталона
+                    for j in range(0, j0):                                  # Перебор всех столбцов одной строки эталона
+                        k[di, dj] +=(ri[i,j]-m_ri)*(ci[i+di, j+dj]-m_ci)    # Вычисление корреляционной функции для di,dj элемента
+                        k1[di, dj] += np.abs(ri[i, j] - ci[i+di, j+dj])           # Вычисление разностной функции для di,dj элемента
+                        #print((ri[i, j] - ci[i+di, j+dj]))
                 k1[di,dj] /= np.float64(i0*j0)
                 k[di,dj] /= np.float64(i0*j0*np.sqrt(ci.var()*ri.var()))
-                print("di,dj:", di,dj)
+        #print(np.float64(i0*j0))
         
 
+        return (k,k1)
         
+if __name__ == "__main__":
+    symbol = ["2"]
+    for s in symbol:
+        img_ci = Image.open('./img/CI_{}.png'.format(s))
+        img_ri = Image.open('./img/RI_{}.png'.format(s))
+        ci = np.asarray(img_ci.convert('L'), dtype=np.float64)
+        ri = np.asarray(img_ri.convert('L'), dtype=np.float64)
+        k, k1 = main(ci, ri)
+
+
         maxi = np.argmax(k)
         max_index_j = int(maxi/k.shape[0])
         max_index_i = int(maxi%k.shape[0])
         print(max_index_i,max_index_j)
         draw = ImageDraw.Draw(img_ci)
-        draw.rectangle((max_index_i, max_index_j, max_index_i+i0, max_index_j+j0), outline="red")
-        #img_ci.show()
-        
+        draw.rectangle((max_index_i, max_index_j, max_index_i+ri.shape[0], max_index_j+ri.shape[1]), outline="red")
 
-        #np.set_printoptions(threshold=sys.maxsize)
-        #print(k)
-        
+        img_ci.show()
 
         """
         fig = plt.figure()
@@ -86,11 +79,10 @@ if __name__ == "__main__":
         fig, ax = plt.subplots(1, 2, figsize=(10, 4))
         cb_k = ax[0].imshow(k, cmap="gray")
         cb_k1 = ax[1].imshow(k1, cmap="gray")
+        ax[0].set_title("Корреляционная функция")
+        ax[1].set_title("Разностная функция")
 
         fig.colorbar(cb_k, ax=ax[0])
         fig.colorbar(cb_k1, ax=ax[1])
 
         plt.show()
-
-    
-
