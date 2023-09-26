@@ -31,7 +31,7 @@ def main(ci, ri):
         return (k,k1)
         
 if __name__ == "__main__":
-    symbol = ["2"]
+    symbol = ["2", "7", "9"]
     for s in symbol:
         img_ci = Image.open('./img/CI_{}.png'.format(s))
         img_ri = Image.open('./img/RI_{}.png'.format(s))
@@ -43,44 +43,21 @@ if __name__ == "__main__":
         maxi = np.argmax(k)
         max_index_j = int(maxi/k.shape[0])
         max_index_i = int(maxi%k.shape[0])
-        print(max_index_i,max_index_j)
+        maxi_ = np.argmin(k1)
+        max_index_j_ = int(maxi_/k.shape[0])
+        max_index_i_ = int(maxi_%k.shape[0])
+
         draw = ImageDraw.Draw(img_ci)
         draw.rectangle((max_index_i, max_index_j, max_index_i+ri.shape[0], max_index_j+ri.shape[1]), outline="red")
+        draw.rectangle((max_index_i_, max_index_j_, max_index_i_+ri.shape[0], max_index_j_+ri.shape[1]), outline="blue")
+        print("Символ {}:\n\tКорр. функция:       ({}; {})\n\tРазностная функция:  ({}; {})".format(s,max_index_i,max_index_j, max_index_i_,max_index_j_))
 
-        img_ci.show()
-
-        """
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        X = np.arange(ci.shape[0]-ri.shape[0])
-        Y = np.arange(ci.shape[1]-ri.shape[1])
-        (x ,y) = np.meshgrid(X,Y)
-
-        surf = ax.plot_surface(x, y, k, cmap=cm.coolwarm)
-        fig.colorbar(surf, shrink=0.5, aspect=10)
-
-        fig2 = plt.figure()
-        ax2 = fig2.add_subplot(projection='3d')
-        X = np.arange(ci.shape[0]-ri.shape[0])
-        Y = np.arange(ci.shape[1]-ri.shape[1])
-        (x ,y) = np.meshgrid(X,Y)
-
-        surf2 = ax2.plot_surface(x, y, k1, cmap=cm.coolwarm)
-        fig2.colorbar(surf2, shrink=0.5, aspect=10)
-
-        fig1 = plt.figure()
-        ax1 = fig1.add_subplot(projection='3d')
-        X1 = np.arange(ci.shape[0])
-        Y1 = np.arange(ci.shape[1])
-        (x1 ,y1) = np.meshgrid(X1,Y1)
-        surf1 = ax1.plot_surface(x1,y1, ci,cmap=cm.coolwarm)
-        """
-
-        fig, ax = plt.subplots(1, 2, figsize=(10, 4))
+        fig, ax = plt.subplots(1, 3, figsize=(15, 4))
         cb_k = ax[0].imshow(k, cmap="gray")
         cb_k1 = ax[1].imshow(k1, cmap="gray")
         ax[0].set_title("Корреляционная функция")
         ax[1].set_title("Разностная функция")
+        ax[2].imshow(np.array(img_ci))
 
         fig.colorbar(cb_k, ax=ax[0])
         fig.colorbar(cb_k1, ax=ax[1])
