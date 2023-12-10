@@ -7,71 +7,60 @@ from numba import njit
 import matplotlib.pyplot as plt 
 
 ri = np.zeros((10,10),dtype=np.uint8)
+use_kor = True
 
-def geometry_autoCorrel(mass1, corr_0):
-    # corr_0 - пороговое значение корреляции для расчета # радиуса корреляции
-    res = []
-    res.append([])
-    res.append(corr_0)
-    res.append(1)
-    res.append(1)
+def autoCorrel(ri):
+    tmp = np.zeros_like(ri)
+    tmp1 = np.hstack((tmp,tmp ,tmp))
+    tmp2 = np.hstack((tmp,ri,tmp))
+    f = np.vstack((tmp1, tmp2, tmp1)).astype(float)
+    for i in range(1,5):
+        k = kor(f,ri, 1, i)
+        minval, maxval, min_i, max_i = cv.minMaxLoc(k)
+        k = (k-minval)/(maxval-minval)
+        print(i, "Автокорреляция", minval, maxval)
 
-    base_i = mass1.shape[0]
-    base_j = mass1.shape[1]
-    virtual_surface = np.zeros((base_i*3,base_j*3))
-    virtual_surface[...] = 255
-    virtual_surface[base_i:2*base_i,base_j:2*base_j] = mass1
-    #plt.imshow(virtual_surface, origin="upper", cmap='gray', vmin = 0)
-    #plt.show()
-    res[0] = CorrelMatrix(mass1, virtual_surface)#,1,1,corr_0,0.6) # корреляционная матрица
+        cv.imshow("{} Canvas".format(i), f.astype(np.uint8))
+        cv.imshow("{} Samokorrel".format(i), k)
 
-    kor_func
-
-    # срезы автокорреляции
-    j_max = int(res[0].shape[1]/2)
-    i_max = int(res[0].shape[0]/2)
-    # срез вдоль i
-    i_slice=np.round(res[0][:,j_max], 1)
-    #plt.plot(i_slice)
-    #plt.show()
-    i_slice=i_slice.tolist()
-    c1 = 0 # левая граница радиуса корреляции
-    c1 = i_slice.index(corr_0)
-    # срез вдоль j
-    #j_slice=list(res[0][i_max,:])
-    #c2 = 0 # правя граница радиуса корреляции
-    #c2 = i_slice.index(corr_0)
-    res[2] = np.asarray(i_slice).shape[0]-2*c1 # радиус корреляции по i
-    res[3] = res[2] # радиус корреляции по j
-    return res 
-
-@njit(parallel=True)
-def kor(ci, ri, ci_k=6, ri_k=3, use_korrel=True, use_diff=True, last_index = (0,0)):
+@njit(fastmath=True)
+def raznostnaya(ci, ri, ci_k=3, ri_k=2):
         (M, N) = ci.shape
         (i0, j0) = ri.shape
 
-
-        k = np.zeros((M-i0, N-j0), dtype=np.float64)
-        k1 = np.zeros((M-i0, N-j0), dtype=np.float64)+1e4
-
-        m_ci = ci.mean()
-        m_ri = ri.mean()
-
+        k1 = np.zeros((M-i0, N-j0), dtype=np.float64)
 
         for di in range(0, M-i0, ci_k):
             for dj in range(0, N-j0,ci_k):
-                k1[di, dj] = 0
                 for i in range(0, i0, ri_k):
                     for j in range(0, j0, ri_k):
-                        k[di, dj] += (ri[i,j] - m_ri)*(ci[di + i, dj + j] - m_ci)
                         k1[di, dj] += np.abs(ri[i, j] - ci[i+di, j+dj])
-        k1 /= ri.size/(ri_k**2)
-        k /= ri.size/(ri_k**2)
+        k1 /= i0*j0/ri_k/ri_k
         
-        return (k,k1)
+        return k1
 
-vid = cv.VideoCapture('./2/try2.mp4') 
-#vid = cv.VideoCapture(0) 
+@njit(fastmath=True)
+def kor(ci, ri, ci_k=3, ri_k=2):
+        (M, N) = ci.shape
+        (i0, j0) = ri.shape
+        ci_m = ci.mean()
+        ri_m = ri.mean()
+        k1 = np.zeros((M-i0, N-j0), dtype=np.float64)
+
+        for di in range(0, M-i0, ci_k):
+            for dj in range(0, N-j0,ci_k):
+                for i in range(0, i0, ri_k):
+                    for j in range(0, j0, ri_k):
+                        k1[di, dj] += (ri[i, j]-ri_m)*(ci[i+di, j+dj]-ci_m)
+        k1 /= (i0*j0/ri_k/ri_k*np.sqrt(ri.var()*ci.var()))
+        
+        return k1
+
+
+vid = cv.VideoCapture(0) 
+vid.set(cv.CAP_PROP_FRAME_WIDTH, 320)
+vid.set(cv.CAP_PROP_FRAME_HEIGHT, 240)
+
 first_tick = True
 
 def main():
@@ -90,62 +79,71 @@ def main():
             ri = frame_grey[int((height-ri_height)/2):int((height+ri_height)/2), int((width-ri_width)/2):int((width+ri_width)/2)]
             first_tick = False
 
-
         frame = cv.rectangle(frame,
                                 (int((width+ri_width)/2), int((height+ri_height)/2)),
                                 (int((width-ri_width)/2), int((height-ri_height)/2)),
                                 (100,100,0),
                                 2)
         
-        #frame = frame.astype(float)
-        #ri = ri.astype(float)
-        
-        #korrel,raz = kor(frame_grey, ri)
-        korrel = cv.matchTemplate(frame_grey, ri, cv.TM_CCORR_NORMED)
-        raz = cv.matchTemplate(frame_grey, ri, cv.TM_SQDIFF)
+        frame_grey_ = frame_grey.astype(float)
+        if (use_kor):
+            k = kor(frame_grey_, ri)
+            minval, maxval, min_i, max_i = cv.minMaxLoc(k)
+            k = (k-minval)/(maxval-minval)
 
-        frame = frame.astype(np.uint8)
-
-        minval, maxval, min_i, max_i = cv.minMaxLoc(korrel)
-        korrel = (korrel-minval)/(maxval-minval)
-        
-        frame = cv.rectangle(frame,
-                                max_i,
+            frame = cv.rectangle(frame,
+                                    max_i,
+                                    (max_i[0]+ri_height, max_i[1]+ri_width),
+                                    (0,50,127),
+                                    2)
+            frame = cv.arrowedLine(frame,
                                 (max_i[0]+ri_height, max_i[1]+ri_width),
-                                (255,0,0),
-                                3)
-        
+                                (int((width-ri_width)/2), max_i[1]+ri_width),
+                                (50,50,50),
+                                2)
+            
+            frame = cv.putText(frame, "max(K) = {:.2f}".format(maxval), (20, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (180,10,10), 3, 2)
+            cv.imshow("Raznostnaya", np.uint8(k*255.0))
 
-        minval, maxval, min_i, max_i = cv.minMaxLoc(raz)
-        raz = (raz-minval)/(maxval-minval)
+        else:
+            raz = kor(frame_grey_, ri)
+            raz[raz == raz.min()] = raz.max()
+            # raz = cv.matchTemplate(frame_grey, ri, cv.TM_SQDIFF)
 
-        frame = cv.rectangle(frame,
-                                min_i,
+            minval, maxval, min_i, max_i = cv.minMaxLoc(raz)
+            if minval > 2:
+                frame = cv.putText(frame, "! OBJECT LOST !".format(minval), (20, 100), cv.FONT_HERSHEY_SIMPLEX, 1, (50,50,250), 3, 2)     
+            raz = (raz-minval)/(maxval-minval)
+
+
+            frame = cv.rectangle(frame,
+                                    min_i,
+                                    (min_i[0]+ri_height, min_i[1]+ri_width),
+                                    (0,50,127),
+                                    2)
+            frame = cv.arrowedLine(frame,
                                 (min_i[0]+ri_height, min_i[1]+ri_width),
-                                (0,255,0),
-                                1)
-        ri_ = frame_grey[ min_i[0]:min_i[0]+ri_height, min_i[1]:min_i[1]+ri_width]
-
-        
+                                (int((width-ri_width)/2), min_i[1]+ri_width),
+                                (50,50,50),
+                                2)
+            
+            frame = cv.putText(frame, "min(K) = {:.2f}".format(minval), (20, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (180,10,10), 3, 2)
+            cv.imshow("Raznostnaya", np.uint8(raz*255.0))
         cv.imshow('Video capture', frame)
         cv.imshow("Kernel",ri)
-        cv.imshow("Raznostnaya", np.uint8(raz*255.0))
-        cv.imshow("Korrelatsionnaya", np.uint8(korrel/korrel.max()*255))
-        # the 'q' button is set as the 
-        # quitting button you may use any 
-        # desired button of your choice 
-
+        
+        
         res = cv.waitKey(1)
-        if res & 0xFF == ord('q'): 
+        if res & 0xFF == ord('q') or res == 27: 
             break
         if res & 0xFF == ord('s'): 
-            ri = frame_grey[int((height-ri_height)/2):int((height+ri_height)/2), int((width-ri_width)/2):int((width+ri_width)/2)]
+            ri = frame_grey[int((height-ri_height)/2):int((height+ri_height)/2), int((width-ri_width)/2):int((width+ri_width)/2)].astype(float)
+            autoCorrel(ri)
             print("Обновлено")
     
-        # After the loop release the cap object 
-    vid.release() 
-    # Destroy all the windows 
+    vid.release()
     cv.destroyAllWindows() 
+
 
 if __name__ == "__main__":
     main()
