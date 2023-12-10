@@ -79,26 +79,34 @@ def main():
             ri = frame_grey[int((height-ri_height)/2):int((height+ri_height)/2), int((width-ri_width)/2):int((width+ri_width)/2)]
             first_tick = False
 
+        # Место выделения нового эталона
         frame = cv.rectangle(frame,
                                 (int((width+ri_width)/2), int((height+ri_height)/2)),
                                 (int((width-ri_width)/2), int((height-ri_height)/2)),
                                 (100,100,0),
-                                2)
-        
+                                1)
+        # Приведение к типу для корректной работы
         frame_grey_ = frame_grey.astype(float)
         if (use_kor):
+            # Вычисление корреляционной функции
             k = kor(frame_grey_, ri)
             minval, maxval, min_i, max_i = cv.minMaxLoc(k)
             k = (k-minval)/(maxval-minval)
-
+            
+            #Потеря эталона
+            if maxval < 0.9:
+                frame = cv.putText(frame, "! OBJECT LOST !".format(minval), (20, 100), cv.FONT_HERSHEY_SIMPLEX, 1, (50,50,250), 3, 2)     
+            
+            # Прямоугольник найденного эталона
             frame = cv.rectangle(frame,
                                     max_i,
                                     (max_i[0]+ri_height, max_i[1]+ri_width),
                                     (0,50,127),
                                     2)
+            # Направление от эталона к центру
             frame = cv.arrowedLine(frame,
-                                (max_i[0]+ri_height, max_i[1]+ri_width),
-                                (int((width-ri_width)/2), max_i[1]+ri_width),
+                                (int(max_i[0]+ri_height/2), int(max_i[1]+ri_width/2)),
+                                (int((width+ri_width)/2), int((height+ri_height)/2)),
                                 (50,50,50),
                                 2)
             
@@ -115,12 +123,13 @@ def main():
                 frame = cv.putText(frame, "! OBJECT LOST !".format(minval), (20, 100), cv.FONT_HERSHEY_SIMPLEX, 1, (50,50,250), 3, 2)     
             raz = (raz-minval)/(maxval-minval)
 
-
+            # Прямоугольник найденного эталона
             frame = cv.rectangle(frame,
                                     min_i,
                                     (min_i[0]+ri_height, min_i[1]+ri_width),
                                     (0,50,127),
                                     2)
+            # Направление от эталона к центру
             frame = cv.arrowedLine(frame,
                                 (min_i[0]+ri_height, min_i[1]+ri_width),
                                 (int((width-ri_width)/2), min_i[1]+ri_width),
@@ -129,10 +138,12 @@ def main():
             
             frame = cv.putText(frame, "min(K) = {:.2f}".format(minval), (20, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (180,10,10), 3, 2)
             cv.imshow("Raznostnaya", np.uint8(raz*255.0))
+        
+        # Вывод на экран
         cv.imshow('Video capture', frame)
         cv.imshow("Kernel",ri)
         
-        
+        # Обработчик нажатия на клавишу
         res = cv.waitKey(1)
         if res & 0xFF == ord('q') or res == 27: 
             break
