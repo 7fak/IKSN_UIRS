@@ -6,7 +6,7 @@ from matplotlib import cm
 import sys
 from numba import njit
 
-@njit(parallel=True)
+@njit(fastmath=True, parallel=True)
 def main(ci, ri):
         k = np.zeros((ci.shape[0]-ri.shape[0], ci.shape[1]-ri.shape[1]), dtype=np.float64)
         k1 = np.zeros((ci.shape[0]-ri.shape[0], ci.shape[1]-ri.shape[1]), dtype=np.float64)
