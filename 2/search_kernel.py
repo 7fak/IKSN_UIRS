@@ -6,8 +6,6 @@ import cv2 as cv
 from numba import njit
 import matplotlib.pyplot as plt 
 
-ri = np.zeros((10,10),dtype=np.uint8)
-use_kor = True
 
 def autoCorrel(ri):
     tmp = np.zeros_like(ri)
@@ -39,7 +37,7 @@ def raznostnaya(ci, ri, ci_k=3, ri_k=2):
         
         return k1
 
-@njit(fastmath=True)
+@njit(fastmath=True, parallel=True)
 def kor(ci, ri, ci_k=3, ri_k=2):
         (M, N) = ci.shape
         (i0, j0) = ri.shape
@@ -56,28 +54,40 @@ def kor(ci, ri, ci_k=3, ri_k=2):
         
         return k1
 
+@njit(fastmath=True)
+def kor__(ci, ri):
+    (M, N) = ci.shape
+    ci_m = ci.mean()
+    ri_m = ri.mean()
+    k1 = 0
+
+    for i in range(0, M):
+        for j in range(0, N):
+            k1 += (ri[i, j]-ri_m)*(ci[i, j]-ci_m)
+    k1 /= (M*N*np.sqrt(ri.var()*ci.var()))
+
+    return k1
+
 
 vid = cv.VideoCapture(0) 
 vid.set(cv.CAP_PROP_FRAME_WIDTH, 320)
 vid.set(cv.CAP_PROP_FRAME_HEIGHT, 240)
 
-first_tick = True
 
 def main():
-    global first_tick
-    global ri
+
+    imgs = [ cv.cvtColor(cv.imread("etalons/{}.jpg".format(i)), cv.COLOR_RGB2GRAY) for i in range(6) ]
     
+    ri_width = 50
+    ri_height = 50
+    ri_exist = False
+
+
     while(vid.isOpened()):
         ret, frame = vid.read()
         frame_grey = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        (height, width , chanels) = frame.shape
 
-        if first_tick:
-            (height, width , chanels) = frame.shape
-            print(width, height)
-            ri_width = 50
-            ri_height = 50
-            ri = frame_grey[int((height-ri_height)/2):int((height+ri_height)/2), int((width-ri_width)/2):int((width+ri_width)/2)]
-            first_tick = False
 
         # Место выделения нового эталона
         frame = cv.rectangle(frame,
@@ -85,9 +95,10 @@ def main():
                                 (int((width-ri_width)/2), int((height-ri_height)/2)),
                                 (100,100,0),
                                 1)
+        
         # Приведение к типу для корректной работы
         frame_grey_ = frame_grey.astype(float)
-        if (use_kor):
+        if ri_exist:
             # Вычисление корреляционной функции
             k = kor(frame_grey_, ri)
             minval, maxval, min_i, max_i = cv.minMaxLoc(k)
@@ -111,45 +122,26 @@ def main():
                                 2)
             
             frame = cv.putText(frame, "max(K) = {:.2f}".format(maxval), (20, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (180,10,10), 3, 2)
-            cv.imshow("Raznostnaya", np.uint8(k*255.0))
+            cv.imshow("Korrelatsionnaya", np.uint8(k*255.0))
+            cv.imshow("Kernel",ri)
 
-        else:
-            raz = kor(frame_grey_, ri)
-            raz[raz == raz.min()] = raz.max()
-            # raz = cv.matchTemplate(frame_grey, ri, cv.TM_SQDIFF)
-
-            minval, maxval, min_i, max_i = cv.minMaxLoc(raz)
-            if minval > 2:
-                frame = cv.putText(frame, "! OBJECT LOST !".format(minval), (20, 100), cv.FONT_HERSHEY_SIMPLEX, 1, (50,50,250), 3, 2)     
-            raz = (raz-minval)/(maxval-minval)
-
-            # Прямоугольник найденного эталона
-            frame = cv.rectangle(frame,
-                                    min_i,
-                                    (min_i[0]+ri_height, min_i[1]+ri_width),
-                                    (0,50,127),
-                                    2)
-            # Направление от эталона к центру
-            frame = cv.arrowedLine(frame,
-                                (min_i[0]+ri_height, min_i[1]+ri_width),
-                                (int((width-ri_width)/2), min_i[1]+ri_width),
-                                (50,50,50),
-                                2)
-            
-            frame = cv.putText(frame, "min(K) = {:.2f}".format(minval), (20, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (180,10,10), 3, 2)
-            cv.imshow("Raznostnaya", np.uint8(raz*255.0))
         
         # Вывод на экран
         cv.imshow('Video capture', frame)
-        cv.imshow("Kernel",ri)
+        
         
         # Обработчик нажатия на клавишу
         res = cv.waitKey(1)
         if res & 0xFF == ord('q') or res == 27: 
             break
-        if res & 0xFF == ord('s'): 
-            ri = frame_grey[int((height-ri_height)/2):int((height+ri_height)/2), int((width-ri_width)/2):int((width+ri_width)/2)].astype(float)
-            autoCorrel(ri)
+        if res & 0xFF == ord('s'):
+            ri_ = frame_grey[int((height-ri_height)/2):int((height+ri_height)/2), int((width-ri_width)/2):int((width+ri_width)/2)]
+            ri = ri_.astype(float)
+            ri_exist = True
+            k_list = [kor__(ri, imgs[i]) for i in range(6)]
+            print(k_list)
+            print("Метка ", k_list.index(max(k_list)))
+            # autoCorrel(ri)
             print("Обновлено")
     
     vid.release()
