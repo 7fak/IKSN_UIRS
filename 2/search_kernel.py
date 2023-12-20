@@ -41,6 +41,7 @@ def raznostnaya(ci, ri, ci_k=3, ri_k=2):
 def kor(ci, ri, ci_k=3, ri_k=2):
         (M, N) = ci.shape
         (i0, j0) = ri.shape
+        
         ci_m = ci.mean()
         ri_m = ri.mean()
         k1 = np.zeros((M-i0, N-j0), dtype=np.float64)
@@ -49,6 +50,7 @@ def kor(ci, ri, ci_k=3, ri_k=2):
             for dj in range(0, N-j0,ci_k):
                 for i in range(0, i0, ri_k):
                     for j in range(0, j0, ri_k):
+                        # ci_m = ci[di:di+i0, dj:dj+j0].mean()
                         k1[di, dj] += (ri[i, j]-ri_m)*(ci[i+di, j+dj]-ci_m)
         k1 /= (i0*j0/ri_k/ri_k*np.sqrt(ri.var()*ci.var()))
         
@@ -75,7 +77,7 @@ vid.set(cv.CAP_PROP_FRAME_HEIGHT, 240)
 
 
 def main():
-
+    __m = 0
     imgs = [ cv.cvtColor(cv.imread("etalons/{}.jpg".format(i)), cv.COLOR_RGB2GRAY) for i in range(6) ]
     
     ri_width = 50
@@ -105,9 +107,19 @@ def main():
             k = (k-minval)/(maxval-minval)
             
             #Потеря эталона
-            if maxval < 0.9:
-                frame = cv.putText(frame, "! OBJECT LOST !".format(minval), (20, 100), cv.FONT_HERSHEY_SIMPLEX, 1, (50,50,250), 3, 2)     
-            
+            if maxval < 0.4:
+                frame = cv.putText(frame, "! OBJECT LOST !".format(minval), (20, 100), cv.FONT_HERSHEY_SIMPLEX, 1, (50,50,250), 2, 1)     
+            """
+            elif maxval > 0.4 and maxval < 0.7:
+                ri_ = frame_grey[int(max_i[0]):int(max_i[0]+50), int(max_i[1]):int(max_i[1]+50)]
+                ri = ri_.astype(float)
+                ri_exist = True
+                k_list = [kor__(ri, imgs[i]) for i in range(6)]
+                __m = k_list.index(max(k_list))
+                ri = imgs[__m]
+            """
+
+
             # Прямоугольник найденного эталона
             frame = cv.rectangle(frame,
                                     max_i,
@@ -122,6 +134,7 @@ def main():
                                 2)
             
             frame = cv.putText(frame, "max(K) = {:.2f}".format(maxval), (20, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (180,10,10), 3, 2)
+            frame = cv.putText(frame, "{}".format(__m), max_i, cv.FONT_HERSHEY_SIMPLEX, 1, (180,10,10), 3, 2)
             cv.imshow("Korrelatsionnaya", np.uint8(k*255.0))
             cv.imshow("Kernel",ri)
 
@@ -140,7 +153,9 @@ def main():
             ri_exist = True
             k_list = [kor__(ri, imgs[i]) for i in range(6)]
             print(k_list)
-            print("Метка ", k_list.index(max(k_list)))
+            __m = k_list.index(max(k_list))
+            ri = imgs[__m]
+            print("Метка ", __m)
             # autoCorrel(ri)
             print("Обновлено")
     
